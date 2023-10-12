@@ -74,20 +74,10 @@ func InitLogrus() {
 
 	fmt.Println("Initiating logger")
 
-	logrus.SetLevel(logrus.InfoLevel)
-
 	Formatter := new(logrus.TextFormatter)
 	Formatter.FullTimestamp = true
 	Formatter.TimestampFormat = time.RFC3339
 	logrus.SetFormatter(Formatter)
-
-	fmt.Println("Opening log file")
-	fileHandler, err := os.OpenFile("info.log", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0755)
-	if err != nil {
-		logrus.Error(err.Error())
-	}
-
-	logrus.SetOutput(fileHandler)
 
 	// Add the UTC timestamp hook to logrus
 	logrus.AddHook(UTCTimeHook{})
