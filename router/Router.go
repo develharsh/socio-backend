@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/harshvsinghme/socio-backend.git/services"
 )
 
 func InitRouter() *gin.Engine {
@@ -19,6 +20,10 @@ func InitRouter() *gin.Engine {
 		// Respond with JSON
 		ctx.JSON(http.StatusOK, message)
 	})
+
+	router.POST("/v1/auth-service/auth/signup", services.AuthService{}.Signup)
+
+	router.POST("/v1/auth-service/auth/login", services.AuthService{}.Login)
 
 	return router
 }
