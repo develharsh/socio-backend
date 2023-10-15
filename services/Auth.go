@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/harshvsinghme/socio-backend.git/dbUtils"
@@ -26,7 +27,7 @@ func (service AuthService) Signup(ctx *gin.Context) {
 	}
 	var reqBody ReqBody
 	var err error
-	var accessToken string
+	var accessToken, refreshToken string
 	var firstInsert *mongo.InsertOneResult
 	var validation []string
 	var userId primitive.ObjectID
@@ -78,6 +79,25 @@ func (service AuthService) Signup(ctx *gin.Context) {
 	_, err = dbUtils.MongoClient.Database(globals.SECRETS.MONGO_DATABASE).Collection("userdetails").InsertOne(context.TODO(), models.UserDetail{UserId: userId})
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Could not save user details", "errors": []string{err.Error()}})
+		return
+	}
+	//generate  access token
+	accessToken, err = utils.GenerateAccessToken(userId.Hex())
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Could not sign you in, try to login now", "errors": []string{err.Error()}})
+		return
+	}
+
+	//generate refresh token
+	refreshToken, err = utils.GenerateRefreshToken(userId.Hex())
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Could not sign you in, try to login now", "errors": []string{err.Error()}})
+		return
+	}
+	//save access token and refresh token
+	err = utils.SetKeyValueWithExpiryToRedis(accessToken, refreshToken, time.Hour*24*30)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Could not sign you in, try to login now", "errors": []string{err.Error()}})
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{"message": "Registered Successfully", "accessToken": accessToken, "errors": []string{}})
