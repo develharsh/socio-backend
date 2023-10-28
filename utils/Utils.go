@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/gin-gonic/gin"
 	"github.com/harshvsinghme/socio-backend.git/dbUtils"
 	globals "github.com/harshvsinghme/socio-backend.git/global"
 	"golang.org/x/crypto/bcrypt"
@@ -70,4 +71,17 @@ func VerifyPassword(hashedPassword []byte, inputPassword string) error {
 	// Compare the hashed password with the input password
 	err := bcrypt.CompareHashAndPassword(hashedPassword, []byte(inputPassword))
 	return err
+}
+
+func GetValueFromContext(c *gin.Context, key string) string {
+	value, exists := c.Get(key)
+	if !exists {
+		return ""
+	}
+
+	if strValue, ok := value.(string); ok {
+		return strValue
+	}
+
+	return ""
 }
