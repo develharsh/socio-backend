@@ -186,3 +186,8 @@ func (service AuthService) Login(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"message": "Logged you in successfully", "accessToken": accessToken, "errors": []string{}})
 
 }
+
+func (service AuthService) Account(ctx *gin.Context) {
+	userID := utils.GetValueFromContext(ctx, "userId")
+	ctx.JSON(http.StatusOK, gin.H{"userId": userID})
+}

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/harshvsinghme/socio-backend.git/middleware"
 	"github.com/harshvsinghme/socio-backend.git/services"
 )
 
@@ -24,6 +25,9 @@ func InitRouter() *gin.Engine {
 	router.POST("/v1/auth-service/auth/signup", services.AuthService{}.Signup)
 
 	router.POST("/v1/auth-service/auth/login", services.AuthService{}.Login)
+
+	router.GET("/v1/user-service/account", middleware.SessionMiddleware(),
+		services.AuthService{}.Account)
 
 	return router
 }
