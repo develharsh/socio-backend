@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -11,7 +12,10 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/harshvsinghme/socio-backend.git/dbUtils"
 	globals "github.com/harshvsinghme/socio-backend.git/global"
+	"github.com/harshvsinghme/socio-backend.git/models"
 	"github.com/harshvsinghme/socio-backend.git/utils"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 var RedisClient *redis.Client
@@ -27,27 +31,34 @@ func SessionMiddleware() gin.HandlerFunc {
 
 		var err error
 		var userId, refreshToken string
+		var userExists bool
 
 		if accessToken == "" {
 			ctx.JSON(http.StatusUnauthorized, gin.H{"message": "Session expired, please log in again", "errors": []string{"Please log in again"}})
 			ctx.Abort()
 			return
 		}
-		userId, _ = ValidateAccessToken(accessToken)
+		userId, _ = validateAccessToken(accessToken)
 		if userId != "" {
+			userExists = validateUserExistence(userId)
+			if !userExists {
+				ctx.JSON(http.StatusUnauthorized, gin.H{"message": "Session expired, please log in again", "errors": []string{"Please log in again"}})
+				ctx.Abort()
+				return
+			}
 			ctx.Set("userId", userId)
 			ctx.Next()
 			return
 		}
 
-		refreshToken, _ = GetValueFromRedis(accessToken)
+		refreshToken, _ = getValueFromRedis(accessToken)
 		if refreshToken == "" {
 			ctx.JSON(http.StatusUnauthorized, gin.H{"message": "Session expired, please log in again", "errors": []string{"Please log in again"}})
 			ctx.Abort()
 			return
 		}
 
-		userId, _ = ValidateRefreshToken(refreshToken)
+		userId, _ = validateRefreshToken(refreshToken)
 		if userId == "" {
 			ctx.JSON(http.StatusUnauthorized, gin.H{"message": "Session expired, please log in again", "errors": []string{"Please log in again"}})
 			ctx.Abort()
@@ -55,7 +66,7 @@ func SessionMiddleware() gin.HandlerFunc {
 		}
 
 		//remove previous access and refresh token
-		DeleteKeyFromRedis(accessToken)
+		deleteKeyFromRedis(accessToken)
 		//generate new access token
 		accessToken, err = utils.GenerateAccessToken(userId)
 		if err != nil {
@@ -79,12 +90,18 @@ func SessionMiddleware() gin.HandlerFunc {
 			return
 		}
 		//set userId in context
+		userExists = validateUserExistence(userId)
+		if !userExists {
+			ctx.JSON(http.StatusUnauthorized, gin.H{"message": "Session expired, please log in again", "errors": []string{"Please log in again"}})
+			ctx.Abort()
+			return
+		}
 		ctx.Set("userId", userId)
 		ctx.Next()
 	}
 }
 
-func ValidateAccessToken(accessToken string) (string, error) {
+func validateAccessToken(accessToken string) (string, error) {
 	// Parse and validate the access token
 	token, err := jwt.Parse(accessToken, func(token *jwt.Token) (interface{}, error) {
 		// Validate the signing method and return the access token secret
@@ -117,7 +134,7 @@ func ValidateAccessToken(accessToken string) (string, error) {
 	return userId, nil
 }
 
-func GetValueFromRedis(key string) (string, error) {
+func getValueFromRedis(key string) (string, error) {
 	value, err := RedisClient.Get(key).Result()
 	if err == redis.Nil {
 		// Handle case when the key does not exist in Redis
@@ -129,7 +146,7 @@ func GetValueFromRedis(key string) (string, error) {
 	return value, nil
 }
 
-func ValidateRefreshToken(refreshToken string) (string, error) {
+func validateRefreshToken(refreshToken string) (string, error) {
 	// Parse and validate the refresh token
 	token, err := jwt.Parse(refreshToken, func(token *jwt.Token) (interface{}, error) {
 		// Validate the signing method and return the refresh token secret
@@ -162,11 +179,24 @@ func ValidateRefreshToken(refreshToken string) (string, error) {
 	return userId, nil
 }
 
-func DeleteKeyFromRedis(key string) error {
+func deleteKeyFromRedis(key string) error {
 	err := RedisClient.Del(key).Err()
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func validateUserExistence(userId string) bool {
+	var user models.User
+	var err error
+	var userObjId primitive.ObjectID
+	userObjId, err = primitive.ObjectIDFromHex(userId)
+	if err != nil {
+		return false
+	}
+	err = dbUtils.MongoClient.Database(globals.SECRETS.MONGO_DATABASE).Collection("users").FindOne(context.TODO(), bson.M{"_id": userObjId}).Decode(&user)
+	// fmt.Println("Hey", user.Name, user.Email)
+	return err == nil
 }
