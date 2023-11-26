@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 	globals "github.com/harshvsinghme/socio-backend.git/global"
 	"github.com/harshvsinghme/socio-backend.git/models"
 	"github.com/harshvsinghme/socio-backend.git/utils"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -112,7 +115,7 @@ func (service AuthService) Signup(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Could not log you in, try again", "errors": []string{err.Error()}})
 		return
 	}
-	ctx.JSON(http.StatusOK, gin.H{"message": "Registered Successfully", "accessToken": accessToken, "errors": []string{}})
+	ctx.JSON(http.StatusOK, gin.H{"message": "Registered Successfully", "accessToken": accessToken})
 }
 
 func (service AuthService) Login(ctx *gin.Context) {
@@ -183,11 +186,39 @@ func (service AuthService) Login(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Could not log you in, try again", "errors": []string{err.Error()}})
 		return
 	}
-	ctx.JSON(http.StatusOK, gin.H{"message": "Logged you in successfully", "accessToken": accessToken, "errors": []string{}})
+	ctx.JSON(http.StatusOK, gin.H{"message": "Logged you in successfully", "accessToken": accessToken})
 
 }
 
 func (service AuthService) Account(ctx *gin.Context) {
-	userID := utils.GetValueFromContext(ctx, "userId")
-	ctx.JSON(http.StatusOK, gin.H{"userId": userID})
+	userId := utils.GetValueFromContext(ctx, "userId")
+	type UserAccDetails struct {
+		UserId    primitive.ObjectID `bson:"userId,omitempty" json:"userId,omitempty"`
+		Name      string             `bson:"name" json:"name"`
+		Email     string             `bson:"email" json:"email"`
+		Following int32              `bson:"following" json:"following"`
+		Followers int32              `bson:"followers" json:"followers"`
+	}
+	var user UserAccDetails
+	var cursor *mongo.Cursor
+	var err error
+	var userObjId primitive.ObjectID
+	userObjId, _ = primitive.ObjectIDFromHex(userId)
+
+	cursor, err = dbUtils.MongoClient.Database(globals.SECRETS.MONGO_DATABASE).Collection("users").Aggregate(context.TODO(), utils.PipelineUserAccount(userObjId))
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"UserId": userId,
+		})
+		ctx.JSON(http.StatusUnauthorized, gin.H{"message": "Session expired, please log in again", "errors": []string{"Please log in again"}})
+		return
+	}
+	defer cursor.Close(context.TODO())
+
+	for cursor.Next(context.TODO()) {
+		if err := cursor.Decode(&user); err != nil {
+			logrus.Error("error while processing cursor call", fmt.Sprintf("%+v", errors.Wrap(err, err.Error())))
+		}
+	}
+	ctx.JSON(http.StatusOK, gin.H{"userData": user})
 }
