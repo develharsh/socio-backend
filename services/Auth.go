@@ -115,7 +115,7 @@ func (service AuthService) Signup(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Could not log you in, try again", "errors": []string{err.Error()}})
 		return
 	}
-	ctx.JSON(http.StatusOK, gin.H{"message": "Registered Successfully", "accessToken": accessToken, "errors": []string{}})
+	ctx.JSON(http.StatusOK, gin.H{"message": "Registered Successfully", "accessToken": accessToken})
 }
 
 func (service AuthService) Login(ctx *gin.Context) {
@@ -186,7 +186,7 @@ func (service AuthService) Login(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"message": "Could not log you in, try again", "errors": []string{err.Error()}})
 		return
 	}
-	ctx.JSON(http.StatusOK, gin.H{"message": "Logged you in successfully", "accessToken": accessToken, "errors": []string{}})
+	ctx.JSON(http.StatusOK, gin.H{"message": "Logged you in successfully", "accessToken": accessToken})
 
 }
 
